@@ -13,15 +13,27 @@ class SubscriptionManager(models.Manager):
         ct = ContentType.objects.get_for_model(obj)
         Subscription.objects.get_or_create(content_type=ct,object_id=obj.pk,user=user)
 
+class NotificationManager(models.Manager):
     def emit(self,*args,**kwargs):
         backend = kwargs.pop('backend',None) or None
+        notification_cls = kwargs.pop('notification_cls',None) or None
 
+        backends = subscription.get_backends().values()
         if backend:
             backend_module = subscription.get_backends()[backend]()
-            backend_module.emit(*args, **kwargs)
+            backends = [backend_module]
 
-        for backend_module in subscription.get_backends().values():
-            backend_module().emit(*args,**kwargs)
+        for backend in backends:
+            if notification_cls:
+                notification_cls()(backend,*args,**kwargs)
+                continue
+
+            backend.emit(*args,**kwargs)
+
+    def emit_notification(self,notification,*args,**kwargs):
+        kwargs.update({'notification_cls': subscription.load_notification(notification)})
+
+        self.emit(*args,**kwargs)
 
 class Subscription(models.Model):
     user = models.ForeignKey('auth.User')
@@ -30,6 +42,7 @@ class Subscription(models.Model):
     content_object = generic.GenericForeignKey()
     timestamp = models.DateTimeField(editable=False,default=datetime.datetime.now)
     objects = SubscriptionManager()
+    notifications = NotificationManager()
     class Meta:
         db_table ="subscription"
 
