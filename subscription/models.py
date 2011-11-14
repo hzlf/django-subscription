@@ -45,6 +45,7 @@ class Subscription(models.Model):
     notifications = NotificationManager()
     class Meta:
         db_table ="subscription"
+        unique_together = ('user','content_type','object_id')
 
 """
 Seems sensible to auto-subscribe people to objects they comment on.
